@@ -35,6 +35,8 @@ INSTALLED_APPS = [
 
     # Our apps (we'll add these as we create them)
     'accounts',
+    'outlets',   # ← add this
+    'visits',  
 ]
 
 # ─────────────────────────────────────────

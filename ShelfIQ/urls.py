@@ -10,7 +10,9 @@ urlpatterns = [
     # Our API routes — each app gets its own prefix
     path('api/auth/', include('accounts.urls')),
     # We'll add more apps here as we build them:
-    # path('api/visits/', include('visits.urls')),
+    path('api/visits/', include('visits.urls')),
+    path('api/visits/', include('outlets.urls')),
+
     # path('api/fraud/', include('fraud.urls')),
     # path('api/analysis/', include('analysis.urls')),
     # path('api/chat/', include('chat.urls')),
