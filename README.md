@@ -1,49 +1,115 @@
 # ShelfIQ
 
-ShelfIQ is a backend project for retail operations and store analytics. It is designed to collect and manage data about stores, visits, users, alerts, and suspicious activity so that businesses can make better decisions and stay secure.
+ShelfIQ is a modular backend platform built to support retail operations, store analytics, fraud detection, alerts, and internal collaboration. It is designed as a professional, recruiter-friendly portfolio project that demonstrates strong backend engineering, API design, and business-critical data workflows.
 
-## What this project does
+## 🚀 Project Overview
 
-- Stores user accounts and permissions for a retail app.
-- Records outlet details and visit activity.
-- Creates alerts and dashboards for important events.
-- Includes a simple fraud-detection workflow to flag suspicious behavior.
-- Supports a basic chat-style interface for internal communication.
+ShelfIQ collects and manages retail data from users, outlets, and visits, and layers business insights, alerting, and fraud detection on top of that core dataset.
 
-## Why it matters
+Key capabilities:
+- User authentication and role-aware access control
+- Outlet and store management
+- Visit tracking and operational logging
+- Alert generation for important events
+- Fraud and suspicious activity detection
+- Analysis-ready data services
+- Lightweight internal chat/messaging endpoints
 
-This project shows the ability to build a business-focused backend system that handles real retail needs, including:
+## 💡 Why this project stands out
 
-- managing users and stores,
-- tracking customer or visit interactions,
-- detecting issues before they become larger problems,
-- and keeping the system easy to extend.
+ShelfIQ is built with a focus on real-world retail problems:
+- Supports operational visibility across outlets and field visits
+- Adds proactive protections through fraud detection rules
+- Uses a clean Django REST architecture with JWT-based security
+- Keeps the codebase modular so features can grow without becoming monolithic
 
-## What is included
+## 📦 Architecture and Modules
 
-- `accounts/` — user and authentication logic.
-- `outlets/` — store and outlet information.
-- `visits/` — recording visits and activity.
-- `analysis/` — business insight utilities.
-- `alerts/` — notification and alert logic.
-- `fraud/` — suspicious activity checks.
-- `chat/` — lightweight messaging endpoints.
+The repository is organized into reusable Django apps:
+- `accounts/` — custom user model, authentication endpoints, JWT integration
+- `outlets/` — retail outlet metadata, inventory location data, store profiles
+- `visits/` — visit records, activity logging, visit analytics
+- `analysis/` — business insight utilities and analytic serializers
+- `alerts/` — event notifications and alert creation workflows
+- `fraud/` — suspicious behavior detection and risk scoring
+- `chat/` — internal messaging / chat-style API endpoints
 
-## Technology overview
+Additional developer utilities:
+- `management/commands/seed_users.py` — seed the app with demo users
+- `management/commands/seed_outlets.py` — seed the app with demo outlet data
 
-- Built with Django, a popular Python web framework.
-- Uses a local SQLite database for development.
-- Organized into separate app modules so each part of the project is easy to understand and extend.
+## 🛠️ Technology Stack
 
-## Getting started
+- Python 3
+- Django
+- Django REST Framework (DRF)
+- Simple JWT authentication
+- django-cors-headers for frontend integration
+- SQLite for lightweight development
+- `.env`-driven configuration for secrets and API keys
 
-For developers who want to run the project locally:
+## 🔧 Current Implementation Notes
 
-```bash
+The project is configured with a production-ready backend pattern:
+- `AUTH_USER_MODEL = 'accounts.User'`
+- JWT auth enforced globally via DRF settings
+- CORS configured for modern frontend workflows
+- Static and media handling configured for development
+- Environment variables supported for secret management and Twilio/Gemini integration
+
+## 🚀 Setup Instructions
+
+1. Create and activate a virtual environment:
+
+```powershell
 python -m venv .venv
-# Windows PowerShell
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+```
+
+2. Install dependencies:
+
+```powershell
+pip install django djangorestframework djangorestframework-simplejwt python-dotenv django-cors-headers
+```
+
+3. Apply migrations:
+
+```powershell
 python manage.py migrate
+```
+
+4. Create a superuser (optional):
+
+```powershell
+python manage.py createsuperuser
+```
+
+5. Run the development server:
+
+```powershell
 python manage.py runserver
 ```
+
+## 🌐 Environment Variables
+
+Use a `.env` file to provide secrets and third-party keys:
+- `SECRET_KEY`
+- `DEBUG`
+- `GEMINI_API_KEY`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_WHATSAPP_FROM`
+- `TWILIO_WHATSAPP_TO`
+
+## 📂 How to Explore the Codebase
+
+Start with these files and folders:
+- `ShelfIQ/settings.py` — project configuration and installed apps
+- `ShelfIQ/urls.py` — API routing and middleware setup
+- `accounts/` — authentication and user model code
+- `outlets/` and `visits/` — core retail data models
+- `fraud/`, `alerts/`, `analysis/`, `chat/` — advanced business features
+
+---
+
+ShelfIQ is a strong backend demonstration project for recruiters seeking experience in commercial retail systems, API-driven architectures, and data-driven operational platforms.
