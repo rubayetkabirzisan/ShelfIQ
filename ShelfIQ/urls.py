@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/visits/', include('visits.urls')),
     path('api/visits/', include('outlets.urls')),
     path('api/fraud/',  include('fraud.urls')),   # ← add this
+    path('api/analysis/', include('analysis.urls')),  # ← add this
     # path('api/fraud/', include('fraud.urls')),
     # path('api/analysis/', include('analysis.urls')),
     # path('api/chat/', include('chat.urls')),

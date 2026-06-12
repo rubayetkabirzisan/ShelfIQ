@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'outlets',   # ← add this
     'visits', 
     'fraud',    # ← add this 
+    'analysis',   # ← add this
 ]
 
 # ─────────────────────────────────────────
