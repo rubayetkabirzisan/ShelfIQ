@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db.models import Avg, Count, Q
 from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -14,21 +15,8 @@ from outlets.models import Outlet
 class CheckInView(APIView):
     """
     POST /api/visits/checkin/
-
-    The main rep workflow endpoint. Accepts multipart form data
-    (so it can receive both JSON fields AND a file upload in one request).
-
-    Flow:
-    1. Validate fields with CheckInSerializer
-    2. Look up the outlet
-    3. Run GPS geofence check
-    4. Save the Visit with status (synced or gps_flagged)
-    5. Return the created visit
     """
     permission_classes = [IsAuthenticated]
-    # MultiPartParser handles file uploads (image)
-    # FormParser handles regular form fields alongside files
-    # JSONParser handles pure JSON requests (when no file is sent)
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
@@ -38,7 +26,6 @@ class CheckInView(APIView):
 
         data = serializer.validated_data
 
-        # Step 1: Look up the outlet
         try:
             outlet = Outlet.objects.get(id=data['outlet_id'], is_active=True)
         except Outlet.DoesNotExist:
@@ -47,7 +34,6 @@ class CheckInView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Step 2: GPS geofence validation
         within_geofence, distance_m = is_within_geofence(
             rep_lat=data['latitude'],
             rep_lon=data['longitude'],
@@ -57,8 +43,6 @@ class CheckInView(APIView):
 
         visit_status = Visit.STATUS_SYNCED if within_geofence else Visit.STATUS_FLAGGED
 
-        # Step 3: Create the Visit record
-        # request.FILES.get('image') returns the uploaded file object, or None
         visit = Visit.objects.create(
             outlet=outlet,
             rep_name=data['rep_name'],
@@ -71,7 +55,6 @@ class CheckInView(APIView):
             image=request.FILES.get('image'),
         )
 
-        # Step 4: Return response
         response_data = VisitSerializer(visit, context={'request': request}).data
         response_data['gps_distance_metres'] = distance_m
         response_data['gps_flagged'] = not within_geofence
@@ -84,26 +67,13 @@ class VisitListView(generics.ListAPIView):
     GET /api/visits/
     GET /api/visits/?outlet_id=1
     GET /api/visits/?rep_name=John
-
-    Returns all visits, newest first.
-    Supervisors use this to see the full dashboard.
-    Optional query parameter filtering by outlet or rep.
     """
     permission_classes = [IsAuthenticated]
     serializer_class   = VisitSerializer
 
     def get_queryset(self):
-        """
-        get_queryset() is called by ListAPIView to get the data.
-        Overriding it lets us add filtering logic.
-
-        select_related('outlet') is a performance optimization:
-        instead of making a separate DB query for each visit's outlet,
-        Django fetches everything in a single JOIN query.
-        """
         queryset = Visit.objects.select_related('outlet').all()
 
-        # Optional filters from query parameters
         outlet_id = self.request.query_params.get('outlet_id')
         rep_name  = self.request.query_params.get('rep_name')
 
@@ -111,21 +81,16 @@ class VisitListView(generics.ListAPIView):
             queryset = queryset.filter(outlet_id=outlet_id)
         if rep_name:
             queryset = queryset.filter(rep_name__icontains=rep_name)
-            # __icontains = case-insensitive LIKE '%name%'
 
         return queryset
 
     def get_serializer_context(self):
-        """Pass request to serializer so image_url can build absolute URLs."""
         return {'request': self.request}
 
 
 class VisitDetailView(generics.RetrieveAPIView):
     """
     GET /api/visits/<id>/
-
-    Returns a single visit by ID.
-    Used when the frontend needs full details for one check-in.
     """
     permission_classes = [IsAuthenticated]
     serializer_class   = VisitSerializer
@@ -133,3 +98,47 @@ class VisitDetailView(generics.RetrieveAPIView):
 
     def get_serializer_context(self):
         return {'request': self.request}
+
+
+class VisitStatsView(APIView):
+    """
+    GET /api/visits/stats/
+    Returns aggregated statistics for the supervisor dashboard.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from analysis.models import ShelfAnalysis
+        from fraud.models import FraudLog
+
+        total_visits = Visit.objects.count()
+
+        status_counts = Visit.objects.values('status').annotate(
+            count=Count('id')
+        )
+
+        avg_compliance = ShelfAnalysis.objects.aggregate(
+            avg=Avg('compliance_score')
+        )['avg']
+
+        total_fraud = FraudLog.objects.filter(is_fraud=True).count()
+
+        low_compliance_count = ShelfAnalysis.objects.filter(
+            compliance_score__lt=40.0
+        ).count()
+
+        outlet_stats = Visit.objects.values(
+            'outlet__name'
+        ).annotate(
+            visit_count=Count('id'),
+            fraud_count=Count('id', filter=Q(status='gps_flagged'))
+        ).order_by('outlet__name')
+
+        return Response({
+            'total_visits':     total_visits,
+            'total_fraud':      total_fraud,
+            'low_compliance':   low_compliance_count,
+            'avg_compliance':   round(avg_compliance or 0, 2),
+            'status_breakdown': list(status_counts),
+            'outlet_stats':     list(outlet_stats),
+        })
