@@ -1,7 +1,7 @@
 import base64
 import json
 import re
-
+import time
 from google import genai
 from google.genai import types
 from django.conf import settings
@@ -106,24 +106,48 @@ def _parse_gemini_response(response_text: str) -> dict:
 def analyze_shelf_image(image_file, outlet_name: str = '') -> dict:
     """
     Main entry point — sends image to Gemini and returns analysis results.
+    Includes waterfall fallback logic for temporary API 503 errors.
     """
     try:
         client          = _get_gemini_client()
         image_b64, mime = _encode_image_to_base64(image_file)
         prompt          = _build_prompt()
 
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=[
-                types.Part.from_text(text=prompt),
-                types.Part.from_bytes(
-                    data=base64.b64decode(image_b64),
-                    mime_type=mime,
-                ),
-            ]
-        )
+        # List of models to try in order of preference
+        fallback_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite']
+        
+        delay = 2
 
-        return _parse_gemini_response(response.text)
+        # Loop through the models
+        for attempt, model_name in enumerate(fallback_models):
+            try:
+                print(f"Attempting analysis with {model_name}...")
+                response = client.models.generate_content(
+                    model=model_name, 
+                    contents=[
+                        types.Part.from_text(text=prompt),
+                        types.Part.from_bytes(
+                            data=base64.b64decode(image_b64),
+                            mime_type=mime,
+                        ),
+                    ]
+                )
+                
+                # If successful, parse the response and break the loop
+                return _parse_gemini_response(response.text)
+                
+            except Exception as inner_e:
+                if "503" in str(inner_e) or "UNAVAILABLE" in str(inner_e) or "429" in str(inner_e):
+                    # If this isn't the last model in the list, wait and try the next one
+                    if attempt < len(fallback_models) - 1:
+                        print(f"{model_name} busy. Waiting {delay}s before trying fallback...")
+                        time.sleep(delay)
+                        delay *= 1.5 # Slightly increase the wait time
+                        continue
+                    else:
+                        raise Exception("All Gemini models are currently overloaded. Please try again later.")
+                else:
+                    raise inner_e
 
     except ValueError as e:
         return {
