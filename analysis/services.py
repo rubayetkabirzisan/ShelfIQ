@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 import json
 import re
 import time
@@ -50,7 +50,7 @@ COMPETITOR:   Mr. Noodles and any other noodle brand
 
 Count every visible product facing (front-facing product unit on shelf).
 
-Respond with ONLY a valid JSON object in this exact format — no markdown,
+Respond with ONLY a valid JSON object in this exact format â€” no markdown,
 no explanation, just the JSON:
 
 {
@@ -105,7 +105,7 @@ def _parse_gemini_response(response_text: str) -> dict:
 
 def analyze_shelf_image(image_file, outlet_name: str = '') -> dict:
     """
-    Main entry point — sends image to Gemini and returns analysis results.
+    Main entry point â€” sends image to Gemini and returns analysis results.
     Includes waterfall fallback logic for temporary API 503 errors.
     """
     try:
@@ -114,7 +114,7 @@ def analyze_shelf_image(image_file, outlet_name: str = '') -> dict:
         prompt          = _build_prompt()
 
         # List of models to try in order of preference
-        fallback_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite']
+        fallback_models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-flash-lite']
         
         delay = 2
 
