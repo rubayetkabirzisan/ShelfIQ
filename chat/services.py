@@ -2,7 +2,10 @@
 from google.genai import types
 from django.conf import settings
 def _get_client():
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    return genai.Client(
+        api_key=settings.GEMINI_API_KEY,
+        http_options={"api_version": "v1"}
+    )
 def _build_db_context() -> str:
     from visits.models import Visit
     from fraud.models import FraudLog
@@ -62,7 +65,7 @@ Answer questions based on this data. Be concise, professional, and
 actionable. If asked about something not in the data, say so clearly.
 Always refer to specific outlet names and numbers when available."""
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=[
                 types.Part.from_text(text=system_prompt),
                 types.Part.from_text(

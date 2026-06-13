@@ -114,7 +114,7 @@ def analyze_shelf_image(image_file, outlet_name: str = '') -> dict:
         prompt          = _build_prompt()
 
         # List of models to try in order of preference
-        fallback_models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-flash-lite']
+        fallback_models = ['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
         
         delay = 2
 
