@@ -8,28 +8,26 @@ from .serializers import FraudCheckRequestSerializer, FraudLogSerializer
 from .engine import run_all_checks
 from .permissions import IsSupervisor
 from visits.models import Visit
+from alerts.services import send_fraud_alert
 
 
 class FraudCheckView(APIView):
     """
     POST /api/fraud/check/
-
-    Accepts a visit_id, runs all 4 fraud checks,
-    saves the result as a FraudLog, returns the result.
-
-    Any authenticated user (rep or supervisor) can trigger this.
-    Typically called immediately after a check-in.
+    Runs all 4 fraud checks on a visit and saves the result.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = FraudCheckRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         visit_id = serializer.validated_data['visit_id']
 
-        # Load the visit with outlet data (needed for GPS check)
         try:
             visit = Visit.objects.select_related('outlet').get(id=visit_id)
         except Visit.DoesNotExist:
@@ -38,7 +36,6 @@ class FraudCheckView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get the image file if the visit has one
         image_file = None
         if visit.image:
             try:
@@ -46,19 +43,27 @@ class FraudCheckView(APIView):
             except (FileNotFoundError, OSError):
                 image_file = None
 
-        # Run all 4 checks
         results = run_all_checks(visit, image_file)
 
         if image_file:
             image_file.close()
 
-        # Save or update the FraudLog
-        # update_or_create: if a FraudLog for this visit exists, update it.
-        # If not, create it. This makes the endpoint safely re-runnable.
         fraud_log, created = FraudLog.objects.update_or_create(
             visit=visit,
             defaults=results
         )
+
+        if fraud_log.is_fraud:
+            fraud_types = []
+            if fraud_log.is_duplicate:     fraud_types.append('Duplicate Image')
+            if fraud_log.is_blurry:        fraud_types.append('Blurry Image')
+            if fraud_log.is_gps_flagged:   fraud_types.append('GPS Spoofing')
+            if fraud_log.is_timestamp_bad: fraud_types.append('Timestamp Anomaly')
+            send_fraud_alert(
+                rep_name=visit.rep_name,
+                outlet_name=visit.outlet.name,
+                fraud_types=fraud_types
+            )
 
         return Response(
             FraudLogSerializer(fraud_log).data,
@@ -69,9 +74,7 @@ class FraudCheckView(APIView):
 class FraudLogListView(generics.ListAPIView):
     """
     GET /api/fraud/logs/
-
-    Returns all fraud logs. Supervisor only.
-    Supervisors use this to see the full fraud audit dashboard.
+    Supervisor only — returns all fraud logs.
     """
     permission_classes = [IsAuthenticated, IsSupervisor]
     serializer_class   = FraudLogSerializer
@@ -79,11 +82,8 @@ class FraudLogListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = FraudLog.objects.select_related(
             'visit', 'visit__outlet'
-            # select_related can follow chains with double underscores
-            # 'visit__outlet' = JOIN visits JOIN outlets in one query
         ).all()
 
-        # Optional filter: only show confirmed fraud
         fraud_only = self.request.query_params.get('fraud_only')
         if fraud_only and fraud_only.lower() == 'true':
             queryset = queryset.filter(is_fraud=True)
@@ -94,18 +94,14 @@ class FraudLogListView(generics.ListAPIView):
 class FraudLogByVisitView(generics.RetrieveAPIView):
     """
     GET /api/fraud/visit/<visit_id>/
-
     Returns the fraud log for a specific visit.
-    Uses visit_id in the URL instead of fraud_log_id.
     """
     permission_classes = [IsAuthenticated]
     serializer_class   = FraudLogSerializer
 
     def get_object(self):
-        visit_id = self.kwargs['visit_id']
-        # get_object_or_404 raises a 404 response automatically if not found
         from django.shortcuts import get_object_or_404
         return get_object_or_404(
             FraudLog.objects.select_related('visit', 'visit__outlet'),
-            visit_id=visit_id
+            visit_id=self.kwargs['visit_id']
         )
